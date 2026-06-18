@@ -213,6 +213,7 @@ if st.button("🔍 Iniciar Cruzamento de Dados", type="primary", use_container_w
                     cat, cap = k
                     val_carmel = prices_carmel.get(k, None)
                     val_io = prices_io.get(k, None)
+                    diff_pct = None  # Diferença percentual entre Base e IO (quando aplicável)
                     
                     # REGRA DE OURO: Ignora tarifas extras da Base que não são pedidas pelo IO (evita falso erro de 'CHD4')
                     if val_io is None and k not in io_expected_keys:
@@ -227,16 +228,18 @@ if st.button("🔍 Iniciar Cruzamento de Dados", type="primary", use_container_w
                         cor_status = "🟡 Ausente no IO"
                     elif val_carmel != val_io:
                         diff = abs(val_carmel - val_io)
-                        # Margem de tolerância: Diferenças de arredondamento de até 1 real são aceitas
-                        if diff <= 1:
+                        diff_pct = (diff / val_carmel * 100) if val_carmel else 0
+                        # Margem de tolerância: Diferenças de até R$5 são aceitas
+                        if diff <= 5:
                             status = "Correto (Arredondado)"
-                            cor_status = "⚪ OK (Ajuste R$1)"
+                            cor_status = f"🟡 OK (Dif. {diff_pct:.1f}%)"
                         else:
                             status = "Inconsistência de Valor"
-                            cor_status = "🔴 Erro de Valor"
+                            cor_status = f"🔴 Erro de Valor ({diff_pct:.1f}%)"
                     else:
                         status = "Correto"
                         cor_status = "🟢 OK"
+                        diff_pct = 0.0
                         
                     # Adiciona a linha ao relatório final
                     comparison.append({
@@ -244,6 +247,7 @@ if st.button("🔍 Iniciar Cruzamento de Dados", type="primary", use_container_w
                         "Acomodação": cap,
                         "Valor Base (Carmel)": val_carmel,
                         "Valor Envio (IO)": val_io,
+                        "Diferença (%)": round(diff_pct, 2) if diff_pct is not None else None,
                         "Status": status,
                         "Análise": cor_status
                     })
@@ -360,7 +364,7 @@ if st.session_state.df_master is not None:
         for cat in categorias:
             with st.expander(f"🏢 CATEGORIA: {cat}", expanded=True):
                 # Seleciona e ordena as colunas que importam na tela
-                df_cat = df_exibicao[df_exibicao['Categoria'] == cat][['Acomodação', 'Valor Base (Carmel)', 'Valor Envio (IO)', 'Análise']]
+                df_cat = df_exibicao[df_exibicao['Categoria'] == cat][['Acomodação', 'Valor Base (Carmel)', 'Valor Envio (IO)', 'Diferença (%)', 'Análise']]
                 
                 # Renderiza a tabela formatando as colunas financeiras
                 st.dataframe(
@@ -369,7 +373,8 @@ if st.session_state.df_master is not None:
                     hide_index=True,
                     column_config={
                         "Valor Base (Carmel)": st.column_config.NumberColumn(format="R$ %.2f"),
-                        "Valor Envio (IO)": st.column_config.NumberColumn(format="R$ %.2f")
+                        "Valor Envio (IO)": st.column_config.NumberColumn(format="R$ %.2f"),
+                        "Diferença (%)": st.column_config.NumberColumn(format="%.2f%%")
                     }
                 )
     else:
